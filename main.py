@@ -99,12 +99,7 @@ def count_dirs_and_files(
             files += 1
         else:
             directories += 1
-            sub_dirs, sub_files = count_dirs_and_files(
-                value,
-                count_hidden,
-                depth_limit,
-                depth+1
-            )
+            sub_dirs, sub_files = count_dirs_and_files(value, count_hidden, depth_limit, depth+1)
             directories += sub_dirs
             files += sub_files
     return directories, files
@@ -136,12 +131,19 @@ if search_limit:
         if flag[0:2] == "-L":
             depth_limit = int(flag[3:])
 
+try:
+    if starting_dir != ".":
+        tree_map = go_inside_tree_map(
+            tree_map,
+            split_directory_into_parts(starting_dir)
+        )
+except KeyError:
+    print(f"{starting_dir} [error opening dir]")
+    print()
+    print("0 directories, 0 files")
+    quit()
+
 print(starting_dir)
-if starting_dir != ".":
-    tree_map = go_inside_tree_map(
-        tree_map,
-        split_directory_into_parts(starting_dir)
-    )
 
 print_sorted_dir_contents(tree_map, [], depth_limit, show_hidden, only_dirs)
 dirs, files = count_dirs_and_files(tree_map, show_hidden, depth_limit)
