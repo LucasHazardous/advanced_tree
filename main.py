@@ -24,10 +24,13 @@ def add_dir_to_tree_map(tree_map, dir_parts):
 def print_sorted_dir_contents(
     tree_map: Dict,
     depth_items_ending_list,
+    depth_limit: int,
     show_hidden: bool = False,
     only_dirs: bool = False,
     depth: int = 1,
 ):
+    if depth_limit != -1 and depth > depth_limit:
+        return
     if len(depth_items_ending_list) < depth:
         depth_items_ending_list = depth_items_ending_list[:] + [False]
 
@@ -71,6 +74,7 @@ def print_sorted_dir_contents(
             print_sorted_dir_contents(
                 tree_map[object_name],
                 depth_items_ending_list,
+                depth_limit,
                 show_hidden,
                 only_dirs,
                 depth + 1
@@ -79,8 +83,13 @@ def print_sorted_dir_contents(
 
 def count_dirs_and_files(
     tree_map: Dict,
-    count_hidden: bool
+    count_hidden: bool,
+    depth_limit: int = -1,
+    depth: int = 1
 ) -> Tuple[int, int]:
+    if depth_limit != -1 and depth > depth_limit:
+        return 0, 0
+
     directories, files = 0, 0
     for key, value in tree_map.items():
         if key[0] == "." and not count_hidden:
@@ -90,7 +99,12 @@ def count_dirs_and_files(
             files += 1
         else:
             directories += 1
-            sub_dirs, sub_files = count_dirs_and_files(value, count_hidden)
+            sub_dirs, sub_files = count_dirs_and_files(
+                value,
+                count_hidden,
+                depth_limit,
+                depth+1
+            )
             directories += sub_dirs
             files += sub_files
     return directories, files
@@ -113,6 +127,15 @@ for i in range(number_of_files):
 show_hidden = "-a" in flags
 only_dirs = "-d" in flags
 
+search_limit = "-L" in flags
+depth_limit = -1
+if search_limit:
+    flags = flags.split(",")
+    for flag in flags:
+        flag = flag.strip()
+        if flag[0:2] == "-L":
+            depth_limit = int(flag[3:])
+
 print(starting_dir)
 if starting_dir != ".":
     tree_map = go_inside_tree_map(
@@ -120,8 +143,8 @@ if starting_dir != ".":
         split_directory_into_parts(starting_dir)
     )
 
-print_sorted_dir_contents(tree_map, [], show_hidden, only_dirs)
-dirs, files = count_dirs_and_files(tree_map, show_hidden)
+print_sorted_dir_contents(tree_map, [], depth_limit, show_hidden, only_dirs)
+dirs, files = count_dirs_and_files(tree_map, show_hidden, depth_limit)
 print()
 
 summary = f"{dirs} {'directory' if dirs == 1 else 'directories'}"
