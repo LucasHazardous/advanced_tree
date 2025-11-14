@@ -21,19 +21,38 @@ def add_dir_to_tree_map(tree_map, dir_parts):
     current_map_to_insert_to[dir_parts[-1]] = ""
 
 
-def print_sorted_dir_contents(tree_map: Dict, depth: int = 1):
+def print_sorted_dir_contents(
+    tree_map: Dict,
+    depth_items_ending_list,
+    depth: int = 1
+):
+    if len(depth_items_ending_list) < depth:
+        depth_items_ending_list = depth_items_ending_list[:] + [False]
+
     objects_names = sorted(tree_map.keys())
     for i, object_name in enumerate(objects_names):
         current_depth_touching_sign = "|"
 
+        ending = False
         if i == len(objects_names) - 1:
             current_depth_touching_sign = "`"
+            ending = True
 
-        depth_info = "|   " * (depth - 1)
+        depth_items_ending_list[depth - 1] = ending
+
+        depth_info = ""
+        for depth_item_ending in depth_items_ending_list[:-1]:
+            if depth_item_ending:
+                depth_info += "    "
+            else:
+                depth_info += "|   "
+
         print(f"{depth_info}{current_depth_touching_sign}-- {object_name}")
 
         if tree_map[object_name] != "":
-            print_sorted_dir_contents(tree_map[object_name], depth + 1)
+            print_sorted_dir_contents(
+                tree_map[object_name], depth_items_ending_list, depth + 1
+            )
 
 
 def count_dirs_and_files(tree_map: Dict) -> Tuple[int, int]:
@@ -71,7 +90,7 @@ if starting_dir != ".":
         split_directory_into_parts(starting_dir)
     )
 
-print_sorted_dir_contents(tree_map)
+print_sorted_dir_contents(tree_map, [])
 dirs, files = count_dirs_and_files(tree_map)
 print()
 print(
