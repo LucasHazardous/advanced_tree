@@ -25,6 +25,7 @@ def print_sorted_dir_contents(
     tree_map: Dict,
     depth_items_ending_list,
     show_hidden: bool = False,
+    only_dirs: bool = False,
     depth: int = 1,
 ):
     if len(depth_items_ending_list) < depth:
@@ -35,6 +36,11 @@ def print_sorted_dir_contents(
     if not show_hidden:
         objects_names = list(
             filter(lambda name: name[0] != ".", objects_names)
+        )
+
+    if only_dirs:
+        objects_names = list(
+            filter(lambda name: tree_map[name] != '', objects_names)
         )
 
     objects_names = sorted(
@@ -66,6 +72,7 @@ def print_sorted_dir_contents(
                 tree_map[object_name],
                 depth_items_ending_list,
                 show_hidden,
+                only_dirs,
                 depth + 1
             )
 
@@ -104,6 +111,7 @@ for i in range(number_of_files):
     add_dir_to_tree_map(tree_map, dir_parts)
 
 show_hidden = "-a" in flags
+only_dirs = "-d" in flags
 
 print(starting_dir)
 if starting_dir != ".":
@@ -112,10 +120,11 @@ if starting_dir != ".":
         split_directory_into_parts(starting_dir)
     )
 
-print_sorted_dir_contents(tree_map, [], show_hidden)
+print_sorted_dir_contents(tree_map, [], show_hidden, only_dirs)
 dirs, files = count_dirs_and_files(tree_map, show_hidden)
 print()
-print(
-    f"{dirs} {'directory' if dirs == 1 else 'directories'},"
-    f" {files} {'file' if files == 1 else 'files'}"
-)
+
+summary = f"{dirs} {'directory' if dirs == 1 else 'directories'}"
+if not only_dirs:
+    summary += f", {files} {'file' if files == 1 else 'files'}"
+print(summary)
