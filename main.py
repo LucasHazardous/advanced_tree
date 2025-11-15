@@ -123,6 +123,17 @@ def go_inside_tree_map(tree_map: Dict, dir_parts: List[str]) -> Dict:
     return tree_map
 
 
+def generate_summary(
+    dir_count: int,
+    file_count: int,
+    only_dirs: bool = False
+) -> str:
+    summary = f"{dir_count} {'directory' if dir_count == 1 else 'directories'}"
+    if not only_dirs:
+        summary += f", {file_count} {'file' if file_count == 1 else 'files'}"
+    return summary
+
+
 starting_dir = input()
 flags = input()
 number_of_files = int(input())
@@ -152,7 +163,7 @@ try:
 except KeyError:
     print(f"{starting_dir} [error opening dir]")
     print()
-    print("0 directories, 0 files")
+    print(generate_summary(0, 0, only_dirs))
     quit()
 
 try:
@@ -166,14 +177,12 @@ try:
 except AttributeError:
     print(f"{starting_dir} [error opening dir]")
     print()
-    print("0 directories, 0 files")
+    print(generate_summary(0, 0, only_dirs))
     quit()
 
 print(starting_dir)
 print(main_tree_content)
 dirs, files = count_dirs_and_files(tree_map, show_hidden, depth_limit)
 
-summary = f"{dirs} {'directory' if dirs == 1 else 'directories'}"
-if not only_dirs:
-    summary += f", {files} {'file' if files == 1 else 'files'}"
+summary = generate_summary(dirs, files, only_dirs)
 print(summary)
