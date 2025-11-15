@@ -11,7 +11,7 @@ def split_directory_into_parts(dir: str) -> List[str]:
     return split_paths
 
 
-def add_dir_to_tree_map(tree_map, dir_parts):
+def add_dir_to_tree_map(tree_map: Dict, dir_parts: List[str]):
     current_map_to_insert_to = tree_map
     for dir_part in dir_parts[:-1]:
         if dir_part not in current_map_to_insert_to:
@@ -21,16 +21,19 @@ def add_dir_to_tree_map(tree_map, dir_parts):
     current_map_to_insert_to[dir_parts[-1]] = ""
 
 
-def print_sorted_dir_contents(
+def produce_tree_sorted_dir_contents(
     tree_map: Dict,
     depth_items_ending_list,
     depth_limit: int,
     show_hidden: bool = False,
     only_dirs: bool = False,
     depth: int = 1,
-):
+) -> str:
+    result_tree = ""
+
     if depth_limit != -1 and depth > depth_limit:
-        return
+        return result_tree
+
     if len(depth_items_ending_list) < depth:
         depth_items_ending_list = depth_items_ending_list[:] + [False]
 
@@ -68,10 +71,13 @@ def print_sorted_dir_contents(
             else:
                 depth_info += "|   "
 
-        print(f"{depth_info}{current_depth_touching_sign}-- {object_name}")
+        result_tree += (
+            f"{depth_info}{current_depth_touching_sign}"
+            f"-- {object_name}\n"
+        )
 
         if tree_map[object_name] != "":
-            print_sorted_dir_contents(
+            result_tree += produce_tree_sorted_dir_contents(
                 tree_map[object_name],
                 depth_items_ending_list,
                 depth_limit,
@@ -79,6 +85,7 @@ def print_sorted_dir_contents(
                 only_dirs,
                 depth + 1
             )
+    return result_tree
 
 
 def count_dirs_and_files(
@@ -99,7 +106,12 @@ def count_dirs_and_files(
             files += 1
         else:
             directories += 1
-            sub_dirs, sub_files = count_dirs_and_files(value, count_hidden, depth_limit, depth+1)
+            sub_dirs, sub_files = count_dirs_and_files(
+                value,
+                count_hidden,
+                depth_limit,
+                depth+1
+            )
             directories += sub_dirs
             files += sub_files
     return directories, files
@@ -143,11 +155,23 @@ except KeyError:
     print("0 directories, 0 files")
     quit()
 
-print(starting_dir)
+try:
+    main_tree_content = produce_tree_sorted_dir_contents(
+        tree_map,
+        [],
+        depth_limit,
+        show_hidden,
+        only_dirs
+    )
+except AttributeError:
+    print(f"{starting_dir} [error opening dir]")
+    print()
+    print("0 directories, 0 files")
+    quit()
 
-print_sorted_dir_contents(tree_map, [], depth_limit, show_hidden, only_dirs)
+print(starting_dir)
+print(main_tree_content)
 dirs, files = count_dirs_and_files(tree_map, show_hidden, depth_limit)
-print()
 
 summary = f"{dirs} {'directory' if dirs == 1 else 'directories'}"
 if not only_dirs:
