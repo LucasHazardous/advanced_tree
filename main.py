@@ -1,7 +1,19 @@
-# To debug: print("Debug messages...", file=sys.stderr, flush=True)
+from dataclasses import dataclass
 from typing import List, Dict, Tuple
 
-tree_map = {}
+
+@dataclass
+class FlagData:
+    show_hidden_objects: bool
+    show_only_dirs: bool
+    search_depth_limit: int = -1
+
+
+@dataclass
+class InputData:
+    tree_map: Dict
+    starting_dir: str
+    flag_data: FlagData
 
 
 def split_directory_into_parts(dir: str) -> List[str]:
@@ -21,68 +33,79 @@ def add_dir_to_tree_map(tree_map: Dict, dir_parts: List[str]):
     current_map_to_insert_to[dir_parts[-1]] = ""
 
 
-def produce_tree_sorted_dir_contents(
-    tree_map: Dict,
-    depth_items_ending_list,
-    depth_limit: int,
-    show_hidden: bool = False,
-    only_dirs: bool = False,
-    depth: int = 1,
-) -> str:
-    result_tree = ""
+def filter_out_objects_with_dot(objects_names: List[str]) -> List[str]:
+    return list(
+        filter(lambda name: name[0] != ".", objects_names)
+    )
 
-    if depth_limit != -1 and depth > depth_limit:
-        return result_tree
 
-    if len(depth_items_ending_list) < depth:
-        depth_items_ending_list = depth_items_ending_list[:] + [False]
+def filter_out_files(objects_names: List[str], tree_map: Dict) -> List[str]:
+    return list(
+        filter(lambda name: tree_map[name] != '', objects_names)
+    )
 
-    objects_names = tree_map.keys()
 
-    if not show_hidden:
-        objects_names = list(
-            filter(lambda name: name[0] != ".", objects_names)
-        )
-
-    if only_dirs:
-        objects_names = list(
-            filter(lambda name: tree_map[name] != '', objects_names)
-        )
-
-    objects_names = sorted(
+def sort_objects_names(objects_names: List[str]) -> List[str]:
+    return sorted(
         objects_names,
         key=lambda name: name[1:].lower() if name[0] == '.' else name.lower()
     )
 
+
+def construct_depth_into(item_last_on_depths: List[bool]) -> str:
+    depth_info = ""
+    for item_last_on_depth in item_last_on_depths[:-1]:
+        if item_last_on_depth:
+            depth_info += "    "
+        else:
+            depth_info += "|   "
+    return depth_info
+
+
+def produce_tree_sorted_dir_contents(
+    tree_map: Dict,
+    item_last_on_depths: List[bool],
+    flag_data: FlagData,
+    depth: int = 1,
+) -> str:
+    result_tree = ""
+
+    if (
+        flag_data.search_depth_limit != -1 and
+        depth > flag_data.search_depth_limit
+    ):
+        return result_tree
+
+    if len(item_last_on_depths) < depth:
+        item_last_on_depths = item_last_on_depths[:] + [False]
+
+    objects_names = tree_map.keys()
+
+    if not flag_data.show_hidden_objects:
+        objects_names = filter_out_objects_with_dot(objects_names)
+
+    if flag_data.show_only_dirs:
+        objects_names = filter_out_files(objects_names, tree_map)
+
+    objects_names = sort_objects_names(objects_names)
+
     for i, object_name in enumerate(objects_names):
-        current_depth_touching_sign = "|"
+        last_object_on_depth = (i == len(objects_names) - 1)
 
-        ending = False
-        if i == len(objects_names) - 1:
-            current_depth_touching_sign = "`"
-            ending = True
+        item_last_on_depths[depth - 1] = last_object_on_depth
 
-        depth_items_ending_list[depth - 1] = ending
-
-        depth_info = ""
-        for depth_item_ending in depth_items_ending_list[:-1]:
-            if depth_item_ending:
-                depth_info += "    "
-            else:
-                depth_info += "|   "
+        depth_info = construct_depth_into(item_last_on_depths)
 
         result_tree += (
-            f"{depth_info}{current_depth_touching_sign}"
+            f"{depth_info}{'`' if last_object_on_depth else '|'}"
             f"-- {object_name}\n"
         )
 
         if tree_map[object_name] != "":
             result_tree += produce_tree_sorted_dir_contents(
                 tree_map[object_name],
-                depth_items_ending_list,
-                depth_limit,
-                show_hidden,
-                only_dirs,
+                item_last_on_depths,
+                flag_data,
                 depth + 1
             )
     return result_tree
@@ -90,16 +113,18 @@ def produce_tree_sorted_dir_contents(
 
 def count_dirs_and_files(
     tree_map: Dict,
-    count_hidden: bool,
-    depth_limit: int = -1,
+    flag_data: FlagData,
     depth: int = 1
 ) -> Tuple[int, int]:
-    if depth_limit != -1 and depth > depth_limit:
+    if (
+        flag_data.search_depth_limit != -1 and
+        depth > flag_data.search_depth_limit
+    ):
         return 0, 0
 
     directories, files = 0, 0
     for key, value in tree_map.items():
-        if key[0] == "." and not count_hidden:
+        if key[0] == "." and not flag_data.show_hidden_objects:
             continue
 
         if value == "":
@@ -108,8 +133,7 @@ def count_dirs_and_files(
             directories += 1
             sub_dirs, sub_files = count_dirs_and_files(
                 value,
-                count_hidden,
-                depth_limit,
+                flag_data,
                 depth+1
             )
             directories += sub_dirs
@@ -134,55 +158,75 @@ def generate_summary(
     return summary
 
 
-starting_dir = input()
-flags = input()
-number_of_files = int(input())
-for i in range(number_of_files):
-    line = input()
-    dir_parts = split_directory_into_parts(line)
-    add_dir_to_tree_map(tree_map, dir_parts)
+def parse_flag_data(flags: str) -> FlagData:
+    show_hidden = False
+    show_only_dirs = False
+    depth_limit = -1
 
-show_hidden = "-a" in flags
-only_dirs = "-d" in flags
-
-search_limit = "-L" in flags
-depth_limit = -1
-if search_limit:
     flags = flags.split(",")
     for flag in flags:
         flag = flag.strip()
-        if flag[0:2] == "-L":
-            depth_limit = int(flag[3:])
 
+        if flag[0:2] == "-L":
+            try:
+                depth_limit = int(flag[3:])
+            except ValueError:
+                pass
+        elif flag == "-a":
+            show_hidden = True
+        elif flag == "-d":
+            show_only_dirs = True
+
+    return FlagData(show_hidden, show_only_dirs, depth_limit)
+
+
+def load_inputs() -> InputData:
+    tree_map = {}
+    starting_dir = input()
+    flags = input()
+
+    flag_data = parse_flag_data(flags)
+
+    number_of_files = int(input())
+    for _ in range(number_of_files):
+        line = input()
+        dir_parts = split_directory_into_parts(line)
+        add_dir_to_tree_map(tree_map, dir_parts)
+
+    return InputData(tree_map, starting_dir, flag_data)
+
+
+def error_opening_dir_summary(starting_dir: str, show_only_dirs: bool) -> str:
+    return (
+        f"{starting_dir} [error opening dir]\n\n"
+        f"{generate_summary(0, 0, show_only_dirs)}"
+    )
+
+
+inputs = load_inputs()
+tree_map = inputs.tree_map
 try:
-    if starting_dir != ".":
+    if inputs.starting_dir != ".":
         tree_map = go_inside_tree_map(
             tree_map,
-            split_directory_into_parts(starting_dir)
+            split_directory_into_parts(inputs.starting_dir)
         )
-except KeyError:
-    print(f"{starting_dir} [error opening dir]")
-    print()
-    print(generate_summary(0, 0, only_dirs))
-    quit()
 
-try:
     main_tree_content = produce_tree_sorted_dir_contents(
         tree_map,
         [],
-        depth_limit,
-        show_hidden,
-        only_dirs
+        inputs.flag_data
     )
-except AttributeError:
-    print(f"{starting_dir} [error opening dir]")
-    print()
-    print(generate_summary(0, 0, only_dirs))
+except (KeyError, AttributeError):
+    print(error_opening_dir_summary(
+        inputs.starting_dir,
+        inputs.flag_data.show_only_dirs
+    ))
     quit()
 
-print(starting_dir)
+print(inputs.starting_dir)
 print(main_tree_content)
-dirs, files = count_dirs_and_files(tree_map, show_hidden, depth_limit)
+dirs, files = count_dirs_and_files(tree_map, inputs.flag_data)
 
-summary = generate_summary(dirs, files, only_dirs)
+summary = generate_summary(dirs, files, inputs.flag_data.show_only_dirs)
 print(summary)
